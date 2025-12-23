@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FPS Challenge</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+    body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f7f7f7;
+        color: #111;
+    }
+
+    #top {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: #ffffff;
+        border: 1px solid #bbb;
+        padding: 12px;
+        border-radius: 6px;
+        z-index: 1000;
+        width: 260px;
+    }
+
+    #hideBtn {
+        position: absolute;
+        top: 4px;
+        right: 6px;
+        border: none;
+        background: none;
+        font-weight: bold;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+    #fps {
+        font-size: 22px;
+        font-weight: bold;
+    }
+
+    #count {
+        font-size: 14px;
+        margin-bottom: 8px;
+    }
+
+    button, input {
+        padding: 6px 10px;
+        margin: 3px 0;
+        border: 1px solid #777;
+        background: #eee;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    button:hover {
+        background: #ddd;
+        cursor: pointer;
+    }
+
+    #graph {
+        border: 1px solid #777;
+        margin-top: 8px;
+        background: #fff;
+    }
+
+    #showTab {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        background: #fff;
+        border: 1px solid #bbb;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        display: none;
+        z-index: 1000;
+        font-weight: bold;
+    }
+
+    canvas {
+        display: block;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="top">
+    <button id="hideBtn" onclick="hidePanel()">×</button>
+    <div id="fps">FPS: 0</div>
+    <div id="count">Balls: 0</div>
+
+    <button onclick="startTest()">Start spawning</button>
+    <button onclick="stopTest()">Stop spawning</button>
+
+    <input id="ballInput" type="number" placeholder="Balls to add">
+    <button onclick="addFromInput()">Add balls</button>
+
+    <button onclick="deleteAll()">Delete all balls</button>
+
+    <canvas id="graph" width="240" height="100"></canvas>
+</div>
+
+<div id="showTab" onclick="showPanel()">FPS</div>
+
+<canvas id="scene"></canvas>
+
+<script>
+const canvas = document.getElementById("scene");
+const ctx = canvas.getContext("2d");
+const graph = document.getElementById("graph");
+const gctx = graph.getContext("2d");
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+let balls = [];
+let running = false;
+let spawnInterval = null;
+
+// FPS tracking
+let lastTime = performance.now();
+let frameCount = 0;
+let fps = 0;
+let history = [];
+
+function ball() {
+    return {
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 3,
+        vy: (Math.random() - 0.5) * 3,
+        r: 4,
+        c: `hsl(${Math.random()*360},70%,60%)`
+    };
+}
+
+function updateCount() {
+    document.getElementById("count").textContent = "Balls: " + balls.length;
+}
+
+function addBalls(n) {
+    for (let i = 0; i < n; i++) balls.push(ball());
+    updateCount();
+}
+
+function addFromInput() {
+    const n = parseInt(document.getElementById("ballInput").value);
+    if (!isNaN(n) && n > 0) addBalls(n);
+}
+
+function deleteAll() {
+    balls = [];
+    updateCount();
+}
+
+function startTest() {
+    if (running) return;
+    running = true;
+    spawnInterval = setInterval(() => addBalls(25), 400);
+}
+
+function stopTest() {
+    running = false;
+    clearInterval(spawnInterval);
+}
+
+function updateFPS(t) {
+    frameCount++;
+    if (t - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = t;
+        history.push(fps);
+        if (history.length > 240) history.shift();
+        document.getElementById("fps").textContent = "FPS: " + fps;
+    }
+}
+
+function drawGraph() {
+    gctx.clearRect(0,0,graph.width,graph.height);
+
+    // grid + labels
+    gctx.strokeStyle = "#ddd";
+    gctx.fillStyle = "#555";
+    gctx.font = "10px Arial";
+
+    for (let i = 0; i <= 4; i++) {
+        let y = (i / 4) * graph.height;
+        let label = 120 - i * 30;
+        gctx.beginPath();
+        gctx.moveTo(0, y);
+        gctx.lineTo(graph.width, y);
+        gctx.stroke();
+        gctx.fillText(label + " FPS", 2, y + 10);
+    }
+
+    // FPS line
+    gctx.beginPath();
+    gctx.strokeStyle = "#0077cc";
+    history.forEach((v,i)=>{
+        let x = i;
+        let y = graph.height - (Math.min(v,120)/120)*graph.height;
+        if(i===0) gctx.moveTo(x,y);
+        else gctx.lineTo(x,y);
+    });
+    gctx.stroke();
+}
+
+function update() {
+    balls.forEach(b=>{
+        b.x+=b.vx; b.y+=b.vy;
+        if(b.x<b.r||b.x>canvas.width-b.r) b.vx*=-1;
+        if(b.y<b.r||b.y>canvas.height-b.r) b.vy*=-1;
+    });
+}
+
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    balls.forEach(b=>{
+        ctx.beginPath();
+        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+        ctx.fillStyle=b.c;
+        ctx.fill();
+    });
+}
+
+function hidePanel() {
+    document.getElementById("top").style.display = "none";
+    document.getElementById("showTab").style.display = "block";
+}
+
+function showPanel() {
+    document.getElementById("top").style.display = "block";
+    document.getElementById("showTab").style.display = "none";
+}
+
+function loop(t){
+    updateFPS(t);
+    update();
+    draw();
+    drawGraph();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+
+</body>
+</html>
