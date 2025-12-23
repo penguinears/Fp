@@ -6,113 +6,105 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-    body {
-        margin: 0;
-        font-family: Arial, Helvetica, sans-serif;
-        background: #f7f7f7;
-        color: #111;
-    }
+body {
+    margin: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: #f7f7f7;
+}
 
-    #top {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background: #ffffff;
-        border: 1px solid #bbb;
-        padding: 12px;
-        border-radius: 6px;
-        z-index: 1000;
-        width: 260px;
-    }
+#panel {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: 260px;
+    background: #fff;
+    border: 1px solid #bbb;
+    padding: 10px;
+    border-radius: 6px;
+    z-index: 1000;
+}
 
-    #hideBtn {
-        position: absolute;
-        top: 4px;
-        right: 6px;
-        border: none;
-        background: none;
-        font-weight: bold;
-        cursor: pointer;
-        font-size: 16px;
-    }
+#showPanel {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: #fff;
+    border: 1px solid #bbb;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: none;
+    cursor: pointer;
+    z-index: 1000;
+    font-weight: bold;
+}
 
-    #fps {
-        font-size: 22px;
-        font-weight: bold;
-    }
+#fps {
+    font-size: 22px;
+    font-weight: bold;
+}
 
-    #count {
-        font-size: 14px;
-        margin-bottom: 8px;
-    }
+#count {
+    font-size: 14px;
+    margin-bottom: 6px;
+}
 
-    button, input {
-        padding: 6px 10px;
-        margin: 3px 0;
-        border: 1px solid #777;
-        background: #eee;
-        width: 100%;
-        box-sizing: border-box;
-    }
+button, input {
+    width: 100%;
+    margin: 3px 0;
+    padding: 6px;
+    box-sizing: border-box;
+}
 
-    button:hover {
-        background: #ddd;
-        cursor: pointer;
-    }
+.row {
+    display: flex;
+    gap: 4px;
+}
 
-    #graph {
-        border: 1px solid #777;
-        margin-top: 8px;
-        background: #fff;
-    }
+.row button {
+    flex: 1;
+}
 
-    #showTab {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        background: #fff;
-        border: 1px solid #bbb;
-        padding: 6px 10px;
-        border-radius: 6px;
-        cursor: pointer;
-        display: none;
-        z-index: 1000;
-        font-weight: bold;
-    }
-
-    canvas {
-        display: block;
-    }
+#graph {
+    margin-top: 8px;
+    border: 1px solid #777;
+    background: #fff;
+}
 </style>
 </head>
 
 <body>
 
-<div id="top">
-    <button id="hideBtn" onclick="hidePanel()">×</button>
+<div id="panel">
+    <button onclick="hidePanel()">Hide</button>
+
     <div id="fps">FPS: 0</div>
     <div id="count">Balls: 0</div>
 
-    <button onclick="startTest()">Start spawning</button>
-    <button onclick="stopTest()">Stop spawning</button>
+    <button onclick="startSpawn()">Start spawning</button>
+    <button onclick="stopSpawn()">Stop spawning</button>
 
-    <input id="ballInput" type="number" placeholder="Balls to add">
-    <button onclick="addFromInput()">Add balls</button>
+    <div class="row">
+        <button onclick="addBalls(1)">+1</button>
+        <button onclick="addBalls(2)">+2</button>
+        <button onclick="addBalls(4)">+4</button>
+    </div>
 
-    <button onclick="deleteAll()">Delete all balls</button>
+    <input id="customInput" type="number" placeholder="Custom amount">
+    <button onclick="addCustom()">Add custom</button>
+
+    <button onclick="clearBalls()">Delete all</button>
 
     <canvas id="graph" width="240" height="100"></canvas>
 </div>
 
-<div id="showTab" onclick="showPanel()">FPS</div>
+<div id="showPanel" onclick="showPanel()">Show</div>
 
 <canvas id="scene"></canvas>
 
 <script>
+/* ===== Canvas Setup ===== */
 const canvas = document.getElementById("scene");
 const ctx = canvas.getContext("2d");
-const graph = document.getElementById("graph");
-const gctx = graph.getContext("2d");
 
 function resize() {
     canvas.width = window.innerWidth;
@@ -121,80 +113,83 @@ function resize() {
 resize();
 window.addEventListener("resize", resize);
 
+/* ===== Balls ===== */
 let balls = [];
-let running = false;
-let spawnInterval = null;
 
-// FPS tracking
-let lastTime = performance.now();
-let frameCount = 0;
-let fps = 0;
-let history = [];
-
-function ball() {
+function makeBall() {
     return {
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
         vx: (Math.random() - 0.5) * 3,
         vy: (Math.random() - 0.5) * 3,
-        r: 4,
-        c: `hsl(${Math.random()*360},70%,60%)`
+        r: 4
     };
+}
+
+function addBalls(n) {
+    for (let i = 0; i < n; i++) balls.push(makeBall());
+    updateCount();
+}
+
+function addCustom() {
+    const n = parseInt(document.getElementById("customInput").value);
+    if (n > 0) addBalls(n);
+}
+
+function clearBalls() {
+    balls = [];
+    updateCount();
 }
 
 function updateCount() {
     document.getElementById("count").textContent = "Balls: " + balls.length;
 }
 
-function addBalls(n) {
-    for (let i = 0; i < n; i++) balls.push(ball());
-    updateCount();
+/* ===== Spawning ===== */
+let spawnTimer = null;
+
+function startSpawn() {
+    if (spawnTimer) return;
+    spawnTimer = setInterval(() => addBalls(10), 400);
 }
 
-function addFromInput() {
-    const n = parseInt(document.getElementById("ballInput").value);
-    if (!isNaN(n) && n > 0) addBalls(n);
+function stopSpawn() {
+    clearInterval(spawnTimer);
+    spawnTimer = null;
 }
 
-function deleteAll() {
-    balls = [];
-    updateCount();
-}
-
-function startTest() {
-    if (running) return;
-    running = true;
-    spawnInterval = setInterval(() => addBalls(25), 400);
-}
-
-function stopTest() {
-    running = false;
-    clearInterval(spawnInterval);
-}
+/* ===== FPS ===== */
+let last = performance.now();
+let frames = 0;
+let fps = 0;
+let history = [];
 
 function updateFPS(t) {
-    frameCount++;
-    if (t - lastTime >= 1000) {
-        fps = frameCount;
-        frameCount = 0;
-        lastTime = t;
+    frames++;
+    if (t - last >= 1000) {
+        fps = frames;
+        frames = 0;
+        last = t;
         history.push(fps);
         if (history.length > 240) history.shift();
         document.getElementById("fps").textContent = "FPS: " + fps;
     }
 }
 
-function drawGraph() {
-    gctx.clearRect(0,0,graph.width,graph.height);
+/* ===== Graph ===== */
+const graph = document.getElementById("graph");
+const gctx = graph.getContext("2d");
 
-    // grid + labels
+function drawGraph() {
+    gctx.clearRect(0, 0, graph.width, graph.height);
+
     gctx.strokeStyle = "#ddd";
     gctx.fillStyle = "#555";
     gctx.font = "10px Arial";
 
     for (let i = 0; i <= 4; i++) {
-        let y = (i / 4) * graph.height;
-        let label = 120 - i * 30;
+        const y = (i / 4) * graph.height;
+        const label = 120 - i * 30;
         gctx.beginPath();
         gctx.moveTo(0, y);
         gctx.lineTo(graph.width, y);
@@ -202,53 +197,49 @@ function drawGraph() {
         gctx.fillText(label + " FPS", 2, y + 10);
     }
 
-    // FPS line
     gctx.beginPath();
     gctx.strokeStyle = "#0077cc";
-    history.forEach((v,i)=>{
-        let x = i;
-        let y = graph.height - (Math.min(v,120)/120)*graph.height;
-        if(i===0) gctx.moveTo(x,y);
-        else gctx.lineTo(x,y);
+    history.forEach((v, i) => {
+        const x = i;
+        const y = graph.height - (Math.min(v, 120) / 120) * graph.height;
+        i === 0 ? gctx.moveTo(x, y) : gctx.lineTo(x, y);
     });
     gctx.stroke();
 }
 
-function update() {
-    balls.forEach(b=>{
-        b.x+=b.vx; b.y+=b.vy;
-        if(b.x<b.r||b.x>canvas.width-b.r) b.vx*=-1;
-        if(b.y<b.r||b.y>canvas.height-b.r) b.vy*=-1;
-    });
-}
-
-function draw() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    balls.forEach(b=>{
-        ctx.beginPath();
-        ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
-        ctx.fillStyle=b.c;
-        ctx.fill();
-    });
-}
-
+/* ===== Panel ===== */
 function hidePanel() {
-    document.getElementById("top").style.display = "none";
-    document.getElementById("showTab").style.display = "block";
+    document.getElementById("panel").style.display = "none";
+    document.getElementById("showPanel").style.display = "block";
 }
 
 function showPanel() {
-    document.getElementById("top").style.display = "block";
-    document.getElementById("showTab").style.display = "none";
+    document.getElementById("panel").style.display = "block";
+    document.getElementById("showPanel").style.display = "none";
 }
 
-function loop(t){
+/* ===== Main Loop ===== */
+function loop(t) {
     updateFPS(t);
-    update();
-    draw();
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    balls.forEach(b => {
+        b.x += b.vx;
+        b.y += b.vy;
+
+        if (b.x < b.r || b.x > canvas.width - b.r) b.vx *= -1;
+        if (b.y < b.r || b.y > canvas.height - b.r) b.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.fillStyle = "#3399ff";
+        ctx.fill();
+    });
+
     drawGraph();
     requestAnimationFrame(loop);
 }
+
 requestAnimationFrame(loop);
 </script>
 
